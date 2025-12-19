@@ -1,0 +1,45 @@
+/.observablehq/cache/
+
+# --- Observable Framework ---
+.observablehq/cache/
+dist/
+
+# --- GitHub Pages ---
+# (build output should not be committed)
+.gh-pages/
+
+# --- Node / npm ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Environment variables / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Editors ---
+.vscode/
+!.vscode/extensions.json
+.idea/
+
+# --- Temporary files ---
+*.tmp
+*.log
+
+# --- Data hygiene ---
+# Raw, sensitive, or embargoed data should never be committed
+data/raw/
+data/private/
+src/data/raw/
+src/data/private/
+
+# --- Scratch / analysis ---
+scratch/
+.ipynb_checkpoints/
