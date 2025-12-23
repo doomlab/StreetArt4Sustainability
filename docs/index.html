@@ -35,7 +35,7 @@ const metadata_df = await FileAttachment(
 return {emotions_df,metadata_df};
 }});
 
-define({id: "9138e14c", inputs: ["emotions_df","Plotly","metadata_df"], outputs: ["countries","excluded","numericColumns","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,Plotly,metadata_df) => {
+define({id: "71fa6d6b", inputs: ["emotions_df","metadata_df","Plotly"], outputs: ["countries","excluded","numericColumns","titleById","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,metadata_df,Plotly) => {
 // Build dropdown options
 const countries = Array.from(
   new Set(emotions_df.map(d => d.Group))
@@ -49,12 +49,17 @@ const numericColumns = Object.keys(emotions_df[0]).filter(col =>
   emotions_df.some(d => typeof d[col] === "number")
 );
 
+// Build a quick lookup: PictureID -> Title
+const titleById = new Map(
+  metadata_df.map(d => [String(d.Number), d.Title])
+);
+
 // Grab DOM elements
 const countrySelect = document.getElementById("country-select");
 const xSelect = document.getElementById("x-select");
 const ySelect = document.getElementById("y-select");
 const plotEl = document.getElementById("scatterplot-container");
-const detailsBox = document.getElementById("point-details");
+const detailsBox = document.querySelector("#point-details .collapse-content");
 
 // Populate selects
 countrySelect.innerHTML = countries
@@ -89,9 +94,16 @@ function updatePlot() {
         x: filtered.map(d => d[x]),
         y: filtered.map(d => d[y]),
         customdata: filtered,
+        text: filtered.map(d =>
+          titleById.get(String(d.PictureID)) ?? "Unknown artwork"
+        ),
         mode: "markers",
         type: "scatter",
-        marker: { size: 8, opacity: 0.7 }
+        marker: { size: 8, opacity: 0.7 },
+        hovertemplate:
+          `<b>%{text}</b><br>` +
+          `<b>${x}:</b> %{x:.2f}<br>` +
+          `<b>${y}:</b> %{y:.2f}<extra></extra>`
       }
     ],
     {
@@ -123,14 +135,11 @@ plotEl.on("plotly_click", (event) => {
   detailsBox.innerHTML = `
     <strong>Selected artwork</strong><br>
     <b>Country:</b> ${d.Group}<br>
-    <b>${xSelect.value}:</b> ${d[xSelect.value]}<br>
-    <b>${ySelect.value}:</b> ${d[ySelect.value]}<br>
+    <b>${xSelect.value}:</b> ${Number(d[xSelect.value]).toFixed(2)}<br>
+    <b>${ySelect.value}:</b> ${Number(d[ySelect.value]).toFixed(2)}<br>
     <b>Picture ID:</b> ${d.PictureID ?? "NA"}<br><br>
-    <img
-    src="/imgs/${String(d.PictureID).padStart(3, "0")}.jpg"
-    alt="Artwork ${d.PictureID}"
-    style="max-width: 100%; height: auto; margin-bottom: 0.75rem;" /><br><br>
-
+    <img src="https://raw.githubusercontent.com/doomlab/StreetArt4Sustainability/refs/heads/main/src/imgs/${String(d.PictureID).padStart(3, "0")}.jpg">
+    <br><br>
     <strong>Metadata</strong><br>
     <b>Artist:</b> ${meta?.Artist ?? "NA"}<br>
     <b>Title:</b> ${meta?.Title ?? "NA"}<br>
@@ -145,28 +154,123 @@ plotEl.on("plotly_click", (event) => {
     <b>Copyright:</b> ${meta?.Copyright ?? "NA"}
   `;
 });
-return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,detailsBox,updatePlot};
+
+// Collapsible card toggle
+document.querySelectorAll(".collapsible").forEach(card => {
+  const toggle = card.querySelector(".collapse-toggle");
+  const content = card.querySelector(".collapse-content");
+
+  toggle.addEventListener("click", () => {
+    const isOpen = content.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", isOpen);
+  });
+});
+return {countries,excluded,numericColumns,titleById,countrySelect,xSelect,ySelect,plotEl,detailsBox,updatePlot};
+}});
+
+define({id: "fc5cef75", inputs: ["countrySelect","emotions_df"], outputs: ["datatableInstance","adjustDataTableColumns","renderDataTable","datatableCard"], body: (countrySelect,emotions_df) => {
+let datatableInstance;
+
+function adjustDataTableColumns() {
+  if (datatableInstance) {
+    datatableInstance.columns.adjust();
+  }
+}
+
+function renderDataTable() {
+  const $ = window.jQuery || window.$;
+  if (!$ || !$.fn || !$.fn.DataTable) return;
+
+  if (datatableInstance) {
+    datatableInstance.destroy();
+    datatableInstance = null;
+  }
+
+  const selectedCountry = countrySelect.value;
+  const filtered = emotions_df.filter(d => d.Group === selectedCountry);
+
+  if (!filtered.length) {
+    $("#datatable-container").html(
+      `<p style="margin: 1rem 0;">No records for ${selectedCountry}.</p>`
+    );
+    return;
+  }
+
+  const columns = Object.keys(filtered[0]).filter(c => c !== "n");
+
+  const thead = `
+    <thead>
+      <tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr>
+    </thead>
+  `;
+
+  const tbody = `
+    <tbody>
+      ${filtered
+        .map(row =>
+          `<tr>${columns.map(c => `<td>${row[c]}</td>`).join("")}</tr>`
+        )
+        .join("")}
+    </tbody>
+  `;
+
+  $("#datatable-container").html(
+    `<table id="datatable" class="display">${thead}${tbody}</table>`
+  );
+
+  datatableInstance = $("#datatable").DataTable({
+    autoWidth: false,
+    pageLength: 10,
+    dom: "Bfrtip",
+    buttons: ["csv", "excel"],
+    order: [],
+    initComplete() {
+      adjustDataTableColumns();
+    },
+    drawCallback() {
+      adjustDataTableColumns();
+    }
+  });
+}
+
+renderDataTable();
+
+countrySelect.addEventListener("change", renderDataTable);
+
+const datatableCard = document
+  .getElementById("datatable-container")
+  ?.closest(".collapsible");
+
+if (datatableCard) {
+  const toggle = datatableCard.querySelector(".collapse-toggle");
+  const content = datatableCard.querySelector(".collapse-content");
+
+  if (toggle && content) {
+    toggle.addEventListener("click", () => {
+      requestAnimationFrame(() => {
+        if (content.classList.contains("open")) {
+          adjustDataTableColumns();
+        }
+      });
+    });
+  }
+}
+return {datatableInstance,adjustDataTableColumns,renderDataTable,datatableCard};
 }});
 
 </script>
 </head>
 <body>
-<input id="observablehq-sidebar-toggle" type="checkbox" title="Toggle sidebar">
-<label id="observablehq-sidebar-backdrop" for="observablehq-sidebar-toggle"></label>
-<nav id="observablehq-sidebar">
-  <ol>
-    <label id="observablehq-sidebar-close" for="observablehq-sidebar-toggle"></label>
-    <li class="observablehq-link observablehq-link-active"><a href="./index">StreetArt4Sustainability</a></li>
-  </ol>
-  <ol>
-    <li class="observablehq-link"><a href="./example-dashboard">Example dashboard</a></li>
-    <li class="observablehq-link"><a href="./example-report">Example report</a></li>
-  </ol>
-</nav>
-<script>{const e=document.querySelector("#observablehq-sidebar"),o=document.querySelector("#observablehq-sidebar-toggle"),r=sessionStorage.getItem("observablehq-sidebar");r?o.checked=r==="true":o.indeterminate=!0;for(const t of document.querySelectorAll("#observablehq-sidebar summary")){const s=t.parentElement;switch(sessionStorage.getItem(`observablehq-sidebar:${t.textContent}`)){case"true":s.open=!0;break;case"false":s.classList.contains("observablehq-section-active")||(s.open=!1);break}}addEventListener("beforeunload",()=>sessionStorage.setItem("observablehq-sidebar-scrolly",`${e.scrollTop}`));const a=sessionStorage.getItem("observablehq-sidebar-scrolly");a!=null&&(e.style.cssText="overflow: hidden;",e.scrollTop=+a,e.style.cssText="");}</script>
 <div id="observablehq-center">
 <main id="observablehq-main" class="observablehq">
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
 <div class="observablehq observablehq--block"><!--:8bc8cd33:--></div>
 <div class="card" style="margin-bottom: 1.5rem;">
   <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem;">
@@ -184,12 +288,37 @@ return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,d
     </div>
   </div>
 </div>
-<div id="scatterplot-container"></div>
-<div id="point-details" class="card" style="margin-top: 1rem;">
-  <em>Click a point to see details.</em>
+<div class="card collapsible">
+  <button class="collapse-toggle" aria-expanded="true">
+    Scatterplot
+  </button>
+  <div class="collapse-content open">
+    <div id="scatterplot-container"></div>
+  </div>
 </div>
-<div class="observablehq observablehq--block"><!--:9138e14c:--></div>
+<div id="point-details" class="card collapsible" style="margin-top: 1rem;">
+  <button class="collapse-toggle" aria-expanded="true">
+    Artwork Details
+  </button>
+  <div class="collapse-content open">
+    <em>Click a point to see details.</em>
+  </div>
+</div>
+<div class="card collapsible" style="margin-top: 1rem;">
+  <button class="collapse-toggle" aria-expanded="false">
+    View the Data
+  </button>
+  <div class="collapse-content">
+    <div id="datatable-container"></div>
+  </div>
+</div>
+<div class="observablehq observablehq--block"><!--:71fa6d6b:--></div>
+<div class="observablehq observablehq--block"><!--:fc5cef75:--></div>
 <style>
+
+body {
+  font-size: 1.15rem;
+}
 
 .hero {
   display: flex;
@@ -236,6 +365,10 @@ return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,d
   font-size: 1.15rem;
 }
 
+.card {
+  font-size: 1.15rem !important;
+}
+
 .card select {
   padding: 0.6rem 0.75rem;
 }
@@ -255,13 +388,92 @@ return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,d
   font-weight: 600;
 }
 
+/* Collapsible card */
+.collapsible {
+  padding: 0;
+}
 
+.collapse-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 1.2rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.collapse-content {
+  padding: 0 1rem 1rem;
+  display: none;
+}
+
+.collapse-content.open {
+  display: block;
+}
+
+/* Force the wrapper to scroll while keeping header/body a single table */
+#datatable-container {
+  overflow-x: auto;
+}
+
+#datatable {
+  min-width: 100%;
+  width: max-content;
+  white-space: nowrap;
+}
+
+/* ---- DataTables alignment fixes (works with scrollX) ---- */
+.dataTables_wrapper .dataTables_scrollHeadInner,
+.dataTables_wrapper .dataTables_scrollHeadInner table,
+.dataTables_wrapper .dataTables_scrollBody table {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.dataTables_wrapper table.dataTable {
+  table-layout: auto;
+  border-collapse: collapse !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th,
+.dataTables_wrapper .dataTables_scrollBody td {
+  padding: 0.6rem 0.75rem !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th,
+.dataTables_wrapper .dataTables_scrollBody td {
+  text-align: right !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th:first-child,
+.dataTables_wrapper .dataTables_scrollBody td:first-child {
+  text-align: left !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th.sorting,
+.dataTables_wrapper .dataTables_scrollHead th.sorting_asc,
+.dataTables_wrapper .dataTables_scrollHead th.sorting_desc {
+  padding-right: 1.6rem !important;
+  background-position: center right 0.5rem !important;
+}
+
+.dataTables_wrapper .dt-buttons,
+.dataTables_wrapper .dataTables_filter {
+  margin-bottom: 0.5rem;
+}
+
+.dataTables_wrapper {
+  overflow-x: auto;
+}
 
 </style>
 </main>
 <footer id="observablehq-footer">
-<nav><a rel="next" href="./example-dashboard"><span>Example dashboard</span></a></nav>
-<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-12-22T18:59:50">Dec 22, 2025</a>.</div>
+<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-12-22T20:15:34">Dec 22, 2025</a>.</div>
 </footer>
 </div>
 </body>
