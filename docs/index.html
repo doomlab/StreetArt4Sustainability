@@ -21,9 +21,9 @@ import {define} from "./_observablehq/client.919d03bd.js";
 import {registerFile} from "./_observablehq/stdlib.73a8ec5a.js";
 
 registerFile("./data/DisplayAppMeans.csv", {"name":"./data/DisplayAppMeans.csv","mimeType":"text/csv","path":"./_file/data/DisplayAppMeans.fdc58656.csv","lastModified":1766168207565,"size":282860});
-registerFile("./data/Metadata_StreetArt4Sustainability.csv", {"name":"./data/Metadata_StreetArt4Sustainability.csv","mimeType":"text/csv","path":"./_file/data/Metadata_StreetArt4Sustainability.a888617f.csv","lastModified":1766168105293,"size":345610});
+registerFile("./data/Metadata_StreetArt4Sustainability.csv", {"name":"./data/Metadata_StreetArt4Sustainability.csv","mimeType":"text/csv","path":"./_file/data/Metadata_StreetArt4Sustainability.f7270e22.csv","lastModified":1766448887027,"size":321283});
 
-define({id: "be175a3a", inputs: ["FileAttachment"], outputs: ["emotions_df","metadata_df"], body: async (FileAttachment) => {
+define({id: "8bc8cd33", inputs: ["FileAttachment"], outputs: ["emotions_df","metadata_df"], body: async (FileAttachment) => {
 // Load CSV files from src/data
 const emotions_df = await FileAttachment(
   "./data/DisplayAppMeans.csv"
@@ -32,14 +32,10 @@ const emotions_df = await FileAttachment(
 const metadata_df = await FileAttachment(
   "./data/Metadata_StreetArt4Sustainability.csv"
 ).csv({ typed: true });
-
-// Quick sanity checks
-emotions_df.slice(0, 3);
-metadata_df.length;
 return {emotions_df,metadata_df};
 }});
 
-define({id: "dd010f25", inputs: ["emotions_df","Plotly"], outputs: ["countries","excluded","numericColumns","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,Plotly) => {
+define({id: "9138e14c", inputs: ["emotions_df","Plotly","metadata_df"], outputs: ["countries","excluded","numericColumns","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,Plotly,metadata_df) => {
 // Build dropdown options
 const countries = Array.from(
   new Set(emotions_df.map(d => d.Group))
@@ -119,12 +115,34 @@ ySelect.addEventListener("change", updatePlot);
 plotEl.on("plotly_click", (event) => {
   const d = event.points[0].customdata;
 
+  // Join metadata: PictureID (emotions) ↔ Number (metadata)
+  const meta = metadata_df.find(
+    m => String(m.Number) === String(d.PictureID)
+  );
+
   detailsBox.innerHTML = `
     <strong>Selected artwork</strong><br>
     <b>Country:</b> ${d.Group}<br>
     <b>${xSelect.value}:</b> ${d[xSelect.value]}<br>
     <b>${ySelect.value}:</b> ${d[ySelect.value]}<br>
-    <b>PictureID:</b> ${d.PictureID ?? "NA"}
+    <b>Picture ID:</b> ${d.PictureID ?? "NA"}<br><br>
+    <img
+    src="/imgs/${String(d.PictureID).padStart(3, "0")}.jpg"
+    alt="Artwork ${d.PictureID}"
+    style="max-width: 100%; height: auto; margin-bottom: 0.75rem;" /><br><br>
+
+    <strong>Metadata</strong><br>
+    <b>Artist:</b> ${meta?.Artist ?? "NA"}<br>
+    <b>Title:</b> ${meta?.Title ?? "NA"}<br>
+    <b>Year:</b> ${meta?.Year ?? "NA"}<br>
+    <b>Location:</b> ${meta?.Location ?? "NA"}<br>
+    <b>Description:</b> ${meta?.Description ?? "NA"}<br>
+    ${
+      meta?.Link
+        ? `<b>Link:</b> <a href="${meta.Link}" target="_blank" rel="noopener">View artwork</a><br>`
+        : ""
+    }
+    <b>Copyright:</b> ${meta?.Copyright ?? "NA"}
   `;
 });
 return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,detailsBox,updatePlot};
@@ -149,7 +167,7 @@ return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,d
 <div id="observablehq-center">
 <main id="observablehq-main" class="observablehq">
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min"></script>
-<div class="observablehq observablehq--block"><!--:be175a3a:--></div>
+<div class="observablehq observablehq--block"><!--:8bc8cd33:--></div>
 <div class="card" style="margin-bottom: 1.5rem;">
   <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem;">
     <div class="inline-control">
@@ -170,7 +188,7 @@ return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,d
 <div id="point-details" class="card" style="margin-top: 1rem;">
   <em>Click a point to see details.</em>
 </div>
-<div class="observablehq observablehq--block"><!--:dd010f25:--></div>
+<div class="observablehq observablehq--block"><!--:9138e14c:--></div>
 <style>
 
 .hero {
@@ -243,7 +261,7 @@ return {countries,excluded,numericColumns,countrySelect,xSelect,ySelect,plotEl,d
 </main>
 <footer id="observablehq-footer">
 <nav><a rel="next" href="./example-dashboard"><span>Example dashboard</span></a></nav>
-<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-12-19T13:50:22">Dec 19, 2025</a>.</div>
+<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-12-22T18:59:50">Dec 22, 2025</a>.</div>
 </footer>
 </div>
 </body>

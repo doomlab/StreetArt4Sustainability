@@ -3,6 +3,7 @@ toc: false
 ---
 
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 ```js data-import
 // Load CSV files from src/data
@@ -13,10 +14,6 @@ const emotions_df = await FileAttachment(
 const metadata_df = await FileAttachment(
   "data/Metadata_StreetArt4Sustainability.csv"
 ).csv({ typed: true });
-
-// Quick sanity checks
-emotions_df.slice(0, 3);
-metadata_df.length;
 ```
 
 <div class="card" style="margin-bottom: 1.5rem;">
@@ -36,9 +33,21 @@ metadata_df.length;
   </div>
 </div>
 
-<div id="scatterplot-container"></div>
-<div id="point-details" class="card" style="margin-top: 1rem;">
-  <em>Click a point to see details.</em>
+<div class="card collapsible">
+  <button class="collapse-toggle" aria-expanded="true">
+    Scatterplot
+  </button>
+  <div class="collapse-content open">
+    <div id="scatterplot-container"></div>
+  </div>
+</div>
+<div id="point-details" class="card collapsible" style="margin-top: 1rem;">
+  <button class="collapse-toggle" aria-expanded="true">
+    Artwork Details
+  </button>
+  <div class="collapse-content open">
+    <em>Click a point to see details.</em>
+  </div>
 </div>
 
 ```js plotly-scatter
@@ -56,12 +65,17 @@ const numericColumns = Object.keys(emotions_df[0]).filter(col =>
   emotions_df.some(d => typeof d[col] === "number")
 );
 
+// Build a quick lookup: PictureID -> Title
+const titleById = new Map(
+  metadata_df.map(d => [String(d.Number), d.Title])
+);
+
 // Grab DOM elements
 const countrySelect = document.getElementById("country-select");
 const xSelect = document.getElementById("x-select");
 const ySelect = document.getElementById("y-select");
 const plotEl = document.getElementById("scatterplot-container");
-const detailsBox = document.getElementById("point-details");
+const detailsBox = document.querySelector("#point-details .collapse-content");
 
 // Populate selects
 countrySelect.innerHTML = countries
@@ -96,9 +110,16 @@ function updatePlot() {
         x: filtered.map(d => d[x]),
         y: filtered.map(d => d[y]),
         customdata: filtered,
+        text: filtered.map(d =>
+          titleById.get(String(d.PictureID)) ?? "Unknown artwork"
+        ),
         mode: "markers",
         type: "scatter",
-        marker: { size: 8, opacity: 0.7 }
+        marker: { size: 8, opacity: 0.7 },
+        hovertemplate:
+          `<b>%{text}</b><br>` +
+          `<b>${x}:</b> %{x:.2f}<br>` +
+          `<b>${y}:</b> %{y:.2f}<extra></extra>`
       }
     ],
     {
@@ -122,17 +143,51 @@ ySelect.addEventListener("change", updatePlot);
 plotEl.on("plotly_click", (event) => {
   const d = event.points[0].customdata;
 
+  // Join metadata: PictureID (emotions) ↔ Number (metadata)
+  const meta = metadata_df.find(
+    m => String(m.Number) === String(d.PictureID)
+  );
+
   detailsBox.innerHTML = `
     <strong>Selected artwork</strong><br>
     <b>Country:</b> ${d.Group}<br>
-    <b>${xSelect.value}:</b> ${d[xSelect.value]}<br>
-    <b>${ySelect.value}:</b> ${d[ySelect.value]}<br>
-    <b>PictureID:</b> ${d.PictureID ?? "NA"}
+    <b>${xSelect.value}:</b> ${Number(d[xSelect.value]).toFixed(2)}<br>
+    <b>${ySelect.value}:</b> ${Number(d[ySelect.value]).toFixed(2)}<br>
+    <b>Picture ID:</b> ${d.PictureID ?? "NA"}<br><br>
+    <img src="https://raw.githubusercontent.com/doomlab/StreetArt4Sustainability/refs/heads/main/src/imgs/${String(d.PictureID).padStart(3, "0")}.jpg">
+    <br><br>
+    <strong>Metadata</strong><br>
+    <b>Artist:</b> ${meta?.Artist ?? "NA"}<br>
+    <b>Title:</b> ${meta?.Title ?? "NA"}<br>
+    <b>Year:</b> ${meta?.Year ?? "NA"}<br>
+    <b>Location:</b> ${meta?.Location ?? "NA"}<br>
+    <b>Description:</b> ${meta?.Description ?? "NA"}<br>
+    ${
+      meta?.Link
+        ? `<b>Link:</b> <a href="${meta.Link}" target="_blank" rel="noopener">View artwork</a><br>`
+        : ""
+    }
+    <b>Copyright:</b> ${meta?.Copyright ?? "NA"}
   `;
+});
+
+// Collapsible card toggle
+document.querySelectorAll(".collapsible").forEach(card => {
+  const toggle = card.querySelector(".collapse-toggle");
+  const content = card.querySelector(".collapse-content");
+
+  toggle.addEventListener("click", () => {
+    const isOpen = content.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", isOpen);
+  });
 });
 ```
 
 <style>
+
+body {
+  font-size: 1.15rem;
+}
 
 .hero {
   display: flex;
@@ -179,6 +234,10 @@ plotEl.on("plotly_click", (event) => {
   font-size: 1.15rem;
 }
 
+.card {
+  font-size: 1.15rem !important;
+}
+
 .card select {
   padding: 0.6rem 0.75rem;
 }
@@ -198,6 +257,29 @@ plotEl.on("plotly_click", (event) => {
   font-weight: 600;
 }
 
+/* Collapsible card */
+.collapsible {
+  padding: 0;
+}
 
+.collapse-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 1.2rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+
+.collapse-content {
+  padding: 0 1rem 1rem;
+  display: none;
+}
+
+.collapse-content.open {
+  display: block;
+}
 
 </style>
