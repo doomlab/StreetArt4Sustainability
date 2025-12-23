@@ -4,6 +4,12 @@ toc: false
 
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
 
 ```js data-import
 // Load CSV files from src/data
@@ -47,6 +53,15 @@ const metadata_df = await FileAttachment(
   </button>
   <div class="collapse-content open">
     <em>Click a point to see details.</em>
+  </div>
+</div>
+
+<div class="card collapsible" style="margin-top: 1rem;">
+  <button class="collapse-toggle" aria-expanded="false">
+    View the Data
+  </button>
+  <div class="collapse-content">
+    <div id="datatable-container"></div>
   </div>
 </div>
 
@@ -183,6 +198,95 @@ document.querySelectorAll(".collapsible").forEach(card => {
 });
 ```
 
+```js datatable
+let datatableInstance;
+
+function adjustDataTableColumns() {
+  if (datatableInstance) {
+    datatableInstance.columns.adjust();
+  }
+}
+
+function renderDataTable() {
+  const $ = window.jQuery || window.$;
+  if (!$ || !$.fn || !$.fn.DataTable) return;
+
+  if (datatableInstance) {
+    datatableInstance.destroy();
+    datatableInstance = null;
+  }
+
+  const selectedCountry = countrySelect.value;
+  const filtered = emotions_df.filter(d => d.Group === selectedCountry);
+
+  if (!filtered.length) {
+    $("#datatable-container").html(
+      `<p style="margin: 1rem 0;">No records for ${selectedCountry}.</p>`
+    );
+    return;
+  }
+
+  const columns = Object.keys(filtered[0]).filter(c => c !== "n");
+
+  const thead = `
+    <thead>
+      <tr>${columns.map(c => `<th>${c}</th>`).join("")}</tr>
+    </thead>
+  `;
+
+  const tbody = `
+    <tbody>
+      ${filtered
+        .map(row =>
+          `<tr>${columns.map(c => `<td>${row[c]}</td>`).join("")}</tr>`
+        )
+        .join("")}
+    </tbody>
+  `;
+
+  $("#datatable-container").html(
+    `<table id="datatable" class="display">${thead}${tbody}</table>`
+  );
+
+  datatableInstance = $("#datatable").DataTable({
+    autoWidth: false,
+    pageLength: 10,
+    dom: "Bfrtip",
+    buttons: ["csv", "excel"],
+    order: [],
+    initComplete() {
+      adjustDataTableColumns();
+    },
+    drawCallback() {
+      adjustDataTableColumns();
+    }
+  });
+}
+
+renderDataTable();
+
+countrySelect.addEventListener("change", renderDataTable);
+
+const datatableCard = document
+  .getElementById("datatable-container")
+  ?.closest(".collapsible");
+
+if (datatableCard) {
+  const toggle = datatableCard.querySelector(".collapse-toggle");
+  const content = datatableCard.querySelector(".collapse-content");
+
+  if (toggle && content) {
+    toggle.addEventListener("click", () => {
+      requestAnimationFrame(() => {
+        if (content.classList.contains("open")) {
+          adjustDataTableColumns();
+        }
+      });
+    });
+  }
+}
+```
+
 <style>
 
 body {
@@ -280,6 +384,63 @@ body {
 
 .collapse-content.open {
   display: block;
+}
+
+/* Force the wrapper to scroll while keeping header/body a single table */
+#datatable-container {
+  overflow-x: auto;
+}
+
+#datatable {
+  min-width: 100%;
+  width: max-content;
+  white-space: nowrap;
+}
+
+/* ---- DataTables alignment fixes (works with scrollX) ---- */
+.dataTables_wrapper .dataTables_scrollHeadInner,
+.dataTables_wrapper .dataTables_scrollHeadInner table,
+.dataTables_wrapper .dataTables_scrollBody table {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.dataTables_wrapper table.dataTable {
+  table-layout: auto;
+  border-collapse: collapse !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th,
+.dataTables_wrapper .dataTables_scrollBody td {
+  padding: 0.6rem 0.75rem !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th,
+.dataTables_wrapper .dataTables_scrollBody td {
+  text-align: right !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th:first-child,
+.dataTables_wrapper .dataTables_scrollBody td:first-child {
+  text-align: left !important;
+}
+
+.dataTables_wrapper .dataTables_scrollHead th.sorting,
+.dataTables_wrapper .dataTables_scrollHead th.sorting_asc,
+.dataTables_wrapper .dataTables_scrollHead th.sorting_desc {
+  padding-right: 1.6rem !important;
+  background-position: center right 0.5rem !important;
+}
+
+.dataTables_wrapper .dt-buttons,
+.dataTables_wrapper .dataTables_filter {
+  margin-bottom: 0.5rem;
+}
+
+.dataTables_wrapper {
+  overflow-x: auto;
 }
 
 </style>
