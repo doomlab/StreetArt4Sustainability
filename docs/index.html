@@ -21,7 +21,7 @@ import {define} from "./_observablehq/client.919d03bd.js";
 import {registerFile} from "./_observablehq/stdlib.73a8ec5a.js";
 
 registerFile("./data/DisplayAppMeans.csv", {"name":"./data/DisplayAppMeans.csv","mimeType":"text/csv","path":"./_file/data/DisplayAppMeans.fdc58656.csv","lastModified":1766168207565,"size":282860});
-registerFile("./data/Metadata_StreetArt4Sustainability.csv", {"name":"./data/Metadata_StreetArt4Sustainability.csv","mimeType":"text/csv","path":"./_file/data/Metadata_StreetArt4Sustainability.f7270e22.csv","lastModified":1766448887027,"size":321283});
+registerFile("./data/Metadata_StreetArt4Sustainability.csv", {"name":"./data/Metadata_StreetArt4Sustainability.csv","mimeType":"text/csv","path":"./_file/data/Metadata_StreetArt4Sustainability.ae5ca22a.csv","lastModified":1767021383723,"size":286029});
 
 define({id: "8bc8cd33", inputs: ["FileAttachment"], outputs: ["emotions_df","metadata_df"], body: async (FileAttachment) => {
 // Load CSV files from src/data
@@ -35,7 +35,7 @@ const metadata_df = await FileAttachment(
 return {emotions_df,metadata_df};
 }});
 
-define({id: "71fa6d6b", inputs: ["emotions_df","metadata_df","Plotly"], outputs: ["countries","excluded","numericColumns","titleById","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,metadata_df,Plotly) => {
+define({id: "07397b84", inputs: ["emotions_df","metadata_df","Plotly"], outputs: ["countries","excluded","numericColumns","titleById","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,metadata_df,Plotly) => {
 // Build dropdown options
 const countries = Array.from(
   new Set(emotions_df.map(d => d.Group))
@@ -94,9 +94,12 @@ function updatePlot() {
         x: filtered.map(d => d[x]),
         y: filtered.map(d => d[y]),
         customdata: filtered,
-        text: filtered.map(d =>
-          titleById.get(String(d.PictureID)) ?? "Unknown artwork"
-        ),
+        text: filtered.map(d => {
+          const title = titleById.get(String(d.PictureID));
+          return title
+            ? `${title} (ID: ${d.PictureID})`
+            : `Artwork ID: ${d.PictureID}`;
+        }),
         mode: "markers",
         type: "scatter",
         marker: { size: 8, opacity: 0.7 },
@@ -145,12 +148,6 @@ plotEl.on("plotly_click", (event) => {
     <b>Title:</b> ${meta?.Title ?? "NA"}<br>
     <b>Year:</b> ${meta?.Year ?? "NA"}<br>
     <b>Location:</b> ${meta?.Location ?? "NA"}<br>
-    <b>Description:</b> ${meta?.Description ?? "NA"}<br>
-    ${
-      meta?.Link
-        ? `<b>Link:</b> <a href="${meta.Link}" target="_blank" rel="noopener">View artwork</a><br>`
-        : ""
-    }
     <b>Copyright:</b> ${meta?.Copyright ?? "NA"}
   `;
 });
@@ -168,7 +165,7 @@ document.querySelectorAll(".collapsible").forEach(card => {
 return {countries,excluded,numericColumns,titleById,countrySelect,xSelect,ySelect,plotEl,detailsBox,updatePlot};
 }});
 
-define({id: "fc5cef75", inputs: ["countrySelect","emotions_df"], outputs: ["datatableInstance","adjustDataTableColumns","renderDataTable","datatableCard"], body: (countrySelect,emotions_df) => {
+define({id: "b36edc71", inputs: ["countrySelect","emotions_df"], outputs: ["datatableInstance","adjustDataTableColumns","renderDataTable","datatableCard"], body: (countrySelect,emotions_df) => {
 let datatableInstance;
 
 function adjustDataTableColumns() {
@@ -222,11 +219,21 @@ function renderDataTable() {
     autoWidth: false,
     pageLength: 10,
     dom: "Bfrtip",
+    initComplete: function () {
+      const api = this.api();
+      // Restrict global search box to PictureID only
+      $('.dataTables_filter input')
+        .off()
+        .on('keyup change', function () {
+          api.columns().search("");        // clear all column searches
+          api.column(columns.indexOf("PictureID"))
+             .search(this.value)
+             .draw();
+        });
+    },
+    searchCols: columns.map(c => (c === "PictureID" ? null : { search: "", regex: false })),
     buttons: ["csv", "excel"],
     order: [],
-    initComplete() {
-      adjustDataTableColumns();
-    },
     drawCallback() {
       adjustDataTableColumns();
     }
@@ -312,8 +319,8 @@ return {datatableInstance,adjustDataTableColumns,renderDataTable,datatableCard};
     <div id="datatable-container"></div>
   </div>
 </div>
-<div class="observablehq observablehq--block"><!--:71fa6d6b:--></div>
-<div class="observablehq observablehq--block"><!--:fc5cef75:--></div>
+<div class="observablehq observablehq--block"><!--:07397b84:--></div>
+<div class="observablehq observablehq--block"><!--:b36edc71:--></div>
 <style>
 
 body {
@@ -473,7 +480,7 @@ body {
 </style>
 </main>
 <footer id="observablehq-footer">
-<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-12-22T20:15:34">Dec 22, 2025</a>.</div>
+<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-12-29T09:43:39">Dec 29, 2025</a>.</div>
 </footer>
 </div>
 </body>

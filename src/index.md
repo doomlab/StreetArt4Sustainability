@@ -125,9 +125,12 @@ function updatePlot() {
         x: filtered.map(d => d[x]),
         y: filtered.map(d => d[y]),
         customdata: filtered,
-        text: filtered.map(d =>
-          titleById.get(String(d.PictureID)) ?? "Unknown artwork"
-        ),
+        text: filtered.map(d => {
+          const title = titleById.get(String(d.PictureID));
+          return title
+            ? `${title} (ID: ${d.PictureID})`
+            : `Artwork ID: ${d.PictureID}`;
+        }),
         mode: "markers",
         type: "scatter",
         marker: { size: 8, opacity: 0.7 },
@@ -176,12 +179,6 @@ plotEl.on("plotly_click", (event) => {
     <b>Title:</b> ${meta?.Title ?? "NA"}<br>
     <b>Year:</b> ${meta?.Year ?? "NA"}<br>
     <b>Location:</b> ${meta?.Location ?? "NA"}<br>
-    <b>Description:</b> ${meta?.Description ?? "NA"}<br>
-    ${
-      meta?.Link
-        ? `<b>Link:</b> <a href="${meta.Link}" target="_blank" rel="noopener">View artwork</a><br>`
-        : ""
-    }
     <b>Copyright:</b> ${meta?.Copyright ?? "NA"}
   `;
 });
@@ -252,11 +249,21 @@ function renderDataTable() {
     autoWidth: false,
     pageLength: 10,
     dom: "Bfrtip",
+    initComplete: function () {
+      const api = this.api();
+      // Restrict global search box to PictureID only
+      $('.dataTables_filter input')
+        .off()
+        .on('keyup change', function () {
+          api.columns().search("");        // clear all column searches
+          api.column(columns.indexOf("PictureID"))
+             .search(this.value)
+             .draw();
+        });
+    },
+    searchCols: columns.map(c => (c === "PictureID" ? null : { search: "", regex: false })),
     buttons: ["csv", "excel"],
     order: [],
-    initComplete() {
-      adjustDataTableColumns();
-    },
     drawCallback() {
       adjustDataTableColumns();
     }
