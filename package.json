@@ -6,6 +6,7 @@
     "build": "observable build",
     "dev": "observable preview",
     "deploy": "observable deploy",
+    "postbuild": "node scripts/ensureNoJekyll.js",
     "observable": "observable"
   },
   "dependencies": {
