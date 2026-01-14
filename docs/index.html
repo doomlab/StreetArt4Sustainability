@@ -35,7 +35,7 @@ const metadata_df = await FileAttachment(
 return {emotions_df,metadata_df};
 }});
 
-define({id: "07397b84", inputs: ["emotions_df","metadata_df","Plotly"], outputs: ["countries","excluded","numericColumns","titleById","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,metadata_df,Plotly) => {
+define({id: "71fa6d6b", inputs: ["emotions_df","metadata_df","Plotly"], outputs: ["countries","excluded","numericColumns","titleById","countrySelect","xSelect","ySelect","plotEl","detailsBox","updatePlot"], body: (emotions_df,metadata_df,Plotly) => {
 // Build dropdown options
 const countries = Array.from(
   new Set(emotions_df.map(d => d.Group))
@@ -94,12 +94,9 @@ function updatePlot() {
         x: filtered.map(d => d[x]),
         y: filtered.map(d => d[y]),
         customdata: filtered,
-        text: filtered.map(d => {
-          const title = titleById.get(String(d.PictureID));
-          return title
-            ? `${title} (ID: ${d.PictureID})`
-            : `Artwork ID: ${d.PictureID}`;
-        }),
+        text: filtered.map(d =>
+          titleById.get(String(d.PictureID)) ?? "Unknown artwork"
+        ),
         mode: "markers",
         type: "scatter",
         marker: { size: 8, opacity: 0.7 },
@@ -148,6 +145,12 @@ plotEl.on("plotly_click", (event) => {
     <b>Title:</b> ${meta?.Title ?? "NA"}<br>
     <b>Year:</b> ${meta?.Year ?? "NA"}<br>
     <b>Location:</b> ${meta?.Location ?? "NA"}<br>
+    <b>Description:</b> ${meta?.Description ?? "NA"}<br>
+    ${
+      meta?.Link
+        ? `<b>Link:</b> <a href="${meta.Link}" target="_blank" rel="noopener">View artwork</a><br>`
+        : ""
+    }
     <b>Copyright:</b> ${meta?.Copyright ?? "NA"}
   `;
 });
@@ -165,7 +168,7 @@ document.querySelectorAll(".collapsible").forEach(card => {
 return {countries,excluded,numericColumns,titleById,countrySelect,xSelect,ySelect,plotEl,detailsBox,updatePlot};
 }});
 
-define({id: "b36edc71", inputs: ["countrySelect","emotions_df"], outputs: ["datatableInstance","adjustDataTableColumns","renderDataTable","datatableCard"], body: (countrySelect,emotions_df) => {
+define({id: "fc5cef75", inputs: ["countrySelect","emotions_df"], outputs: ["datatableInstance","adjustDataTableColumns","renderDataTable","datatableCard"], body: (countrySelect,emotions_df) => {
 let datatableInstance;
 
 function adjustDataTableColumns() {
@@ -219,21 +222,11 @@ function renderDataTable() {
     autoWidth: false,
     pageLength: 10,
     dom: "Bfrtip",
-    initComplete: function () {
-      const api = this.api();
-      // Restrict global search box to PictureID only
-      $('.dataTables_filter input')
-        .off()
-        .on('keyup change', function () {
-          api.columns().search("");        // clear all column searches
-          api.column(columns.indexOf("PictureID"))
-             .search(this.value)
-             .draw();
-        });
-    },
-    searchCols: columns.map(c => (c === "PictureID" ? null : { search: "", regex: false })),
     buttons: ["csv", "excel"],
     order: [],
+    initComplete() {
+      adjustDataTableColumns();
+    },
     drawCallback() {
       adjustDataTableColumns();
     }
@@ -319,8 +312,8 @@ return {datatableInstance,adjustDataTableColumns,renderDataTable,datatableCard};
     <div id="datatable-container"></div>
   </div>
 </div>
-<div class="observablehq observablehq--block"><!--:07397b84:--></div>
-<div class="observablehq observablehq--block"><!--:b36edc71:--></div>
+<div class="observablehq observablehq--block"><!--:71fa6d6b:--></div>
+<div class="observablehq observablehq--block"><!--:fc5cef75:--></div>
 <style>
 
 body {
@@ -480,7 +473,7 @@ body {
 </style>
 </main>
 <footer id="observablehq-footer">
-<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2026-01-14T09:48:34">Jan 14, 2026</a>.</div>
+<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2026-01-14T10:10:10">Jan 14, 2026</a>.</div>
 </footer>
 </div>
 </body>
